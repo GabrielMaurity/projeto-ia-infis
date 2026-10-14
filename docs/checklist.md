@@ -145,6 +145,9 @@ As etapas seguem `docs/tasks.md`; os itens extras vieram das solicitações feit
       (em outros ambientes, usar as variáveis `OpenAI__ApiKey` e `Gemini__ApiKey`)
 - [ ] (Opcional) Gerar novas chaves na OpenAI e no Google AI Studio: as atuais nunca foram para o Git, mas
       apareceram em saídas de ferramentas durante o desenvolvimento
+- [ ] Corrigir a vulnerabilidade alta (GHSA-846f-f764-76mx) do pacote transitivo `System.Security.Cryptography.Pkcs`,
+      trazido pelo `Microsoft.Data.SqlClient` 7.1.0 (Api.Atendimento e Worker.Suporte) e pelo `MimeKit` 4.18.1 (Worker.Suporte):
+      referenciar diretamente uma versão corrigida do pacote
 - [ ] Usuários dedicados no SQL Server (Api.Atendimento e Worker.Suporte só com as permissões necessárias) e no RabbitMQ, em vez de `sa` e do usuário administrador
 - [ ] Conflito da porta `1434` com o SQL Server local (DAC do `MSSQLSERVER`) — parar o serviço local ou trocar a porta
 
