@@ -7,7 +7,7 @@ As etapas seguem `docs/tasks.md`; os itens extras vieram das solicitações feit
 > identifique uma tarefa (instrução registrada no `CLAUDE.md` da raiz).
 > Legenda: `[x]` implementado · `[ ]` pendente · `[~]` parcial.
 
-**Última atualização:** 2026-10-14 (versionamento do projeto e chaves movidas para user-secrets)
+**Última atualização:** 2026-10-14 (README do projeto)
 
 ## Etapa 1 — Estrutura
 
@@ -95,7 +95,7 @@ As etapas seguem `docs/tasks.md`; os itens extras vieram das solicitações feit
 - [x] `docs/worker-suporte.md`
 - [x] `docs/checklist.md`
 - [ ] Atualizar `docs/architecture.md` e `docs/specifications.md` (ainda dizem "embeddings em memória"; faltam MongoDB, SQL Server, ingestão de PDFs, RabbitMQ e Worker.Suporte)
-- [ ] `README.md` com visão geral e como rodar a solução (hoje só tem o título)
+- [x] `README.md` com visão geral, arquitetura, como executar, testes e links para a documentação
 
 ## Etapa 10 — Revisão
 
