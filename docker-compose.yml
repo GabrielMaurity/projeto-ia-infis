@@ -1,0 +1,199 @@
+name: rag-infis
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: postgres-rag-infis
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bd-rag-infis}
+      POSTGRES_USER: ${POSTGRES_USER:-infis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-infis}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata-rag-infis:/var/lib/postgresql/data
+      # Executados apenas na primeira criação do volume.
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - rede-rag-infis
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  pgadmin:
+    image: dpage/pgadmin4:9
+    container_name: pgadmin-rag-infis
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-infis@email.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-infis@2026}
+    ports:
+      - "5051:80"
+    volumes:
+      - pgadmin-rag-infis:/var/lib/pgadmin
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
+    networks:
+      - rede-rag-infis
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/misc/ping || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      # A primeira inicialização do pgAdmin leva ~1-2 min.
+      start_period: 60s
+
+  mongo:
+    image: mongo:8.0
+    container_name: mongo-historico-atendimentos
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-infis}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-infis}
+      # Banco em que os scripts de /docker-entrypoint-initdb.d são executados.
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-bd-historico-atendimentos}
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongodata-historico:/data/db
+      # Executados apenas na primeira criação do volume.
+      - ./docker/mongo/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - rede-rag-infis
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  mongo-express:
+    image: mongo-express:1.0.2-20-alpine3.19
+    container_name: mongo-express-historico
+    restart: unless-stopped
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_USER:-infis}:${MONGO_PASSWORD:-infis}@mongo:27017/?authSource=admin
+      ME_CONFIG_BASICAUTH: "true"
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USER:-infis}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD:-infis}
+    ports:
+      # O Mongo Express escuta na porta 8081 dentro do container.
+      - "5052:8081"
+    networks:
+      - rede-rag-infis
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://$${ME_CONFIG_BASICAUTH_USERNAME}:$${ME_CONFIG_BASICAUTH_PASSWORD}@127.0.0.1:8081/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04
+    container_name: sqlserver-custos-ia
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${SQLSERVER_SA_PASSWORD:-Coti@2026}
+    ports:
+      - "1434:1433"
+    volumes:
+      - sqlserverdata-custos-ia:/var/opt/mssql
+      - ./docker/sqlserver/entrypoint.sh:/docker-entrypoint/entrypoint.sh:ro
+      - ./docker/sqlserver/init:/docker-init:ro
+    # Sobe o SQL Server e executa os scripts de docker/sqlserver/init (cria o banco e a tabela).
+    command: ["/bin/bash", "/docker-entrypoint/entrypoint.sh"]
+    networks:
+      - rede-rag-infis
+    healthcheck:
+      # Saudável só depois que a tabela de consumo existir (scripts de init concluídos).
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -b -Q \"IF OBJECT_ID('[bd-custos-ia].dbo.ConsumoTokens') IS NULL THROW 50000, 'tabela ConsumoTokens nao criada', 1\" -o /dev/null"]
+      interval: 10s
+      timeout: 15s
+      retries: 10
+      start_period: 30s
+
+  adminer:
+    image: adminer:5.5.1
+    container_name: adminer-custos-ia
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: sqlserver
+      # Tema visual. Outros disponíveis: dracula, nette, hever, lavender-light, adminer-dark...
+      ADMINER_DESIGN: pepa-linha
+    ports:
+      # O Adminer escuta na porta 8080 dentro do container.
+      - "5053:8080"
+    networks:
+      - rede-rag-infis
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:8080/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  rabbitmq:
+    image: rabbitmq:4.2.9-management-alpine
+    container_name: rabbitmq-atendimentos
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-infis}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-infis}
+    ports:
+      # AMQP (aplicações)
+      - "5672:5672"
+      # Painel de gerenciamento
+      - "15672:15672"
+    volumes:
+      - rabbitmqdata-atendimentos:/var/lib/rabbitmq
+    networks:
+      - rede-rag-infis
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: mailhog-atendimentos
+    restart: unless-stopped
+    ports:
+      # SMTP (envio de e-mails pelo Worker.Suporte)
+      - "1025:1025"
+      # Interface web com os e-mails recebidos
+      - "8025:8025"
+    networks:
+      - rede-rag-infis
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:8025/api/v2/messages?limit=1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  rabbitmqdata-atendimentos:
+  pgdata-rag-infis:
+  pgadmin-rag-infis:
+  mongodata-historico:
+  sqlserverdata-custos-ia:
+
+networks:
+  rede-rag-infis:
+    driver: bridge

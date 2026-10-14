@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "rag-infis",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "bd-rag-infis",
+      "Username": "infis",
+      "SSLMode": "prefer"
+    }
+  }
+}
