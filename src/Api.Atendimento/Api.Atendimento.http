@@ -1,0 +1,30 @@
+@Api.Atendimento_HostAddress = http://localhost:5255
+
+GET {{Api.Atendimento_HostAddress}}/api/status
+Accept: application/json
+
+###
+
+GET {{Api.Atendimento_HostAddress}}/api/conhecimento/ferramentas
+Accept: application/json
+
+###
+
+POST {{Api.Atendimento_HostAddress}}/api/conhecimento/buscar
+Content-Type: application/json
+
+{
+  "pergunta": "Qual a política de férias?"
+}
+
+###
+
+POST {{Api.Atendimento_HostAddress}}/api/v1/atendimentos
+Content-Type: application/json
+
+{
+  "nomeUsuario": "Gabriel",
+  "pergunta": "Quais são as principais mudanças da Reforma Tributária em 2026?"
+}
+
+###
